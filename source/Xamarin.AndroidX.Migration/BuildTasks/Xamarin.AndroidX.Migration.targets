@@ -42,7 +42,7 @@
         <_AndroidXJavaLibraryIntermediateOutputPath>$(_AndroidXIntermediateOutputPath)jl\</_AndroidXJavaLibraryIntermediateOutputPath>
         <_AndroidXUseVerboseToolOutput Condition="'$(_AndroidXUseVerboseToolOutput)' == ''">false</_AndroidXUseVerboseToolOutput>
         <_AndroidXParallelJetifier Condition="'$(_AndroidXParallelJetifier)' == ''">true</_AndroidXParallelJetifier>
-
+        <_AndroidXCecilfyFilesEnablePdbSupport Condition="'$(_AndroidXCecilfyFilesEnablePdbSupport)' == ''">true</_AndroidXCecilfyFilesEnablePdbSupport>
         <!-- Skip the Android.Support checks if we aren't using Android Support -->
         <XamarinAndroidSupportSkipVerifyVersions Condition="'$(XamarinAndroidSupportSkipVerifyVersions)' == '' and '$(_AndroidXShouldRunMigration)' == 'true'">true</XamarinAndroidSupportSkipVerifyVersions>
     </PropertyGroup>
@@ -211,7 +211,7 @@
 
         <CecilfyFiles Assemblies="@(_AndroidXFileToCecilfy)"
                       SkipEmbeddedResources="true"
-                      Verbose="$(_AndroidXUseVerboseToolOutput)" />
+                      Verbose="$(_AndroidXUseVerboseToolOutput)" EnablePdbSupport="$(_AndroidXCecilfyFilesEnablePdbSupport)"/>
 
         <Touch Files="$(_AndroidStampDirectory)_CopyIntermediateAssemblies.stamp;$(_AndroidStampDirectory)_AndroidXCecilfy.stamp" AlwaysCreate="True" />
 

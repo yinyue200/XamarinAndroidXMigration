@@ -13,6 +13,8 @@ namespace Xamarin.AndroidX.Migration.BuildTasks
 
 		public bool Verbose { get; set; }
 
+		public bool EnablePdbSupport { get; set; } = true;
+
 		public override bool Execute()
 		{
 			var pairs = new List<MigrationPair>(Assemblies.Length);
@@ -25,7 +27,8 @@ namespace Xamarin.AndroidX.Migration.BuildTasks
 			var cecilfier = new CecilMigrator
 			{
 				SkipEmbeddedResources = SkipEmbeddedResources,
-				Verbose = Verbose
+				Verbose = Verbose,
+				EnablePdbSupport = EnablePdbSupport
 			};
 
 			cecilfier.MessageLogged += (sender, e) => LogToolMessage(e);

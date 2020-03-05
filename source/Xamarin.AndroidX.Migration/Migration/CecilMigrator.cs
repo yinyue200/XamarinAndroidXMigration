@@ -32,6 +32,7 @@ namespace Xamarin.AndroidX.Migration
 		{
 			Mapping = mapping;
 		}
+		public bool EnablePdbSupport { get; set; } = true;
 
 		public AndroidXTypesCsvMapping Mapping { get; }
 
@@ -70,12 +71,13 @@ namespace Xamarin.AndroidX.Migration
 			var tempDllPath = Path.ChangeExtension(destination, "temp.dll");
 			var tempPdbPath = Path.ChangeExtension(destination, "temp.pdb");
 
-			var hasPdb = File.Exists(pdbPath);
+			var hasPdb = File.Exists(pdbPath) && EnablePdbSupport;
 			var result = CecilMigrationResult.Skipped;
 
 			using (var resolver = new DefaultAssemblyResolver())
 			{
 				resolver.AddSearchDirectory(Path.GetDirectoryName(source));
+				reset:
 				var readerParams = new ReaderParameters
 				{
 					ReadSymbols = hasPdb,
@@ -83,64 +85,72 @@ namespace Xamarin.AndroidX.Migration
 				};
 
 				var requiresSave = false;
-
-				using (var assembly = AssemblyDefinition.ReadAssembly(source, readerParams))
+				try
 				{
-					LogVerboseMessage($"Processing assembly '{source}'...");
-
-					if (!hasPdb)
-						LogVerboseMessage($"  No debug symbols found for the assembly.");
-
-					result = MigrateAssembly(assembly);
-
-					requiresSave =
-						result.HasFlag(CecilMigrationResult.ContainedSupport) ||
-						result.HasFlag(CecilMigrationResult.ContainedJni) ||
-						result.HasFlag(CecilMigrationResult.ContainedJavaArtifacts);
-
-					var dir = Path.GetDirectoryName(destination);
-					if (!string.IsNullOrWhiteSpace(dir) && !Directory.Exists(dir))
-						Directory.CreateDirectory(dir);
-
-					if (requiresSave)
+					using (var assembly = AssemblyDefinition.ReadAssembly(source, readerParams))
 					{
-						Stream symbolStream = null;
-						PdbWriterProvider symbolWriter = null;
-						if (hasPdb)
-						{
-							symbolStream = File.Create(tempPdbPath);
-							symbolWriter = new PdbWriterProvider();
-						}
+						LogVerboseMessage($"Processing assembly '{source}'...");
 
-						try
-						{
-							assembly.Write(tempDllPath, new WriterParameters
-							{
-								WriteSymbols = hasPdb,
-								SymbolStream = symbolStream,
-								SymbolWriterProvider = symbolWriter
-							});
-						}
-						finally
-						{
-							symbolStream?.Dispose();
-						}
+						if (!hasPdb)
+							LogVerboseMessage($"  No debug symbols found for the assembly.");
 
-						LogMessage($"Migrated assembly to '{destination}'.");
-					}
-					else
-					{
-						LogVerboseMessage($"Skipped assembly '{source}' due to lack of support types.");
+						result = MigrateAssembly(assembly);
 
-						if (!source.Equals(destination, StringComparison.OrdinalIgnoreCase))
+						requiresSave =
+							result.HasFlag(CecilMigrationResult.ContainedSupport) ||
+							result.HasFlag(CecilMigrationResult.ContainedJni) ||
+							result.HasFlag(CecilMigrationResult.ContainedJavaArtifacts);
+
+						var dir = Path.GetDirectoryName(destination);
+						if (!string.IsNullOrWhiteSpace(dir) && !Directory.Exists(dir))
+							Directory.CreateDirectory(dir);
+
+						if (requiresSave)
 						{
-							LogVerboseMessage($"Copying source assembly '{source}' to '{destination}'.");
-
-							File.Copy(source, destination, true);
+							Stream symbolStream = null;
+							PdbWriterProvider symbolWriter = null;
 							if (hasPdb)
-								File.Copy(pdbPath, destPdbPath, true);
+							{
+								symbolStream = File.Create(tempPdbPath);
+								symbolWriter = new PdbWriterProvider();
+							}
+
+							try
+							{
+								assembly.Write(tempDllPath, new WriterParameters
+								{
+									WriteSymbols = hasPdb,
+									SymbolStream = symbolStream,
+									SymbolWriterProvider = symbolWriter
+								});
+							}
+							finally
+							{
+								symbolStream?.Dispose();
+							}
+
+							LogMessage($"Migrated assembly to '{destination}'.");
+						}
+						else
+						{
+							LogVerboseMessage($"Skipped assembly '{source}' due to lack of support types.");
+
+							if (!source.Equals(destination, StringComparison.OrdinalIgnoreCase))
+							{
+								LogVerboseMessage($"Copying source assembly '{source}' to '{destination}'.");
+
+								File.Copy(source, destination, true);
+								if (hasPdb)
+									File.Copy(pdbPath, destPdbPath, true);
+							}
 						}
 					}
+				}
+				catch(Mono.Cecil.Cil.SymbolsNotMatchingException)
+				{
+					LogMessage($"Symbols were found but are not matching the assembly({source})");
+					hasPdb = false;
+					goto reset;
 				}
 
 				if (requiresSave)
